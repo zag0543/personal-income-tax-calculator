@@ -69,7 +69,12 @@ def calculate_annual_bonus_tax(bonus_amount, method='separate'):
     """
     if method == 'separate':
         monthly_bonus = bonus_amount / 12
-        return calculate_tax(monthly_bonus * 12, BONUS_TAX_BRACKETS)
+        # 用月平均查税率，然后用年终奖总额计算税额
+        for min_income, max_income, rate, quick_deduction in BONUS_TAX_BRACKETS:
+            if monthly_bonus <= max_income:
+                tax = bonus_amount * rate - quick_deduction
+                return max(tax, 0)
+        return 0
     else:
         return None
 
