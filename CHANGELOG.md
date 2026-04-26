@@ -299,3 +299,23 @@ tax-calculator/
 ---
 
 *最后更新：2026-04-22*
+
+## v2.1.1 Bug修复（2026-04-26）
+
+### 🐛 修复内容
+
+#### deduction_checkup.py 参数格式兼容性修复
+**问题**：JSON模式下，annual_income和medical_expense参数只支持元组格式，传入整数时报错
+
+**修复**：
+- 修复 `annual_income` 参数处理逻辑，同时支持整数和元组格式
+- 修复 `medical_expense` 参数处理逻辑，同时支持整数和元组格式
+- 修复 `generate_report()` 函数中收入描述生成逻辑
+
+**测试验证**：
+```bash
+python3 scripts/deduction_checkup.py --json '{"annual_income": 300000, "school_children": 1}'
+```
+输出正常，无报错。
+
+---

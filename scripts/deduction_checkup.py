@@ -357,8 +357,14 @@ class DeductionCheckupCollector:
             'potential_savings': 0  # 潜在节税金额
         }
         
-        income = self.data.get('annual_income', (0, float('inf')))
-        avg_income = (income[0] + income[1]) / 2 if income[1] != float('inf') else 500000
+        income = self.data.get('annual_income', 0)
+        # 支持整数或元组格式
+        if isinstance(income, (int, float)):
+            avg_income = income
+        elif isinstance(income, (list, tuple)) and len(income) >= 2:
+            avg_income = (income[0] + income[1]) / 2 if income[1] != float('inf') else income[0]
+        else:
+            avg_income = 0
         
         # 根据收入估算税率
         if avg_income <= 36000:
@@ -435,8 +441,14 @@ class DeductionCheckupCollector:
             diagnosis['potential_savings'] += amount * tax_rate
         
         # 4. 大病医疗
-        medical = self.data.get('medical_expense', (0, 0))
-        medical_total = (medical[0] + medical[1]) / 2 if medical[1] != float('inf') else medical[0]
+        medical = self.data.get('medical_expense', 0)
+        # 支持整数或元组格式
+        if isinstance(medical, (int, float)):
+            medical_total = medical
+        elif isinstance(medical, (list, tuple)) and len(medical) >= 2:
+            medical_total = (medical[0] + medical[1]) / 2 if medical[1] != float('inf') else medical[0]
+        else:
+            medical_total = 0
         
         if medical_total > 15000:
             deductable = min(medical_total - 15000, 85000)
@@ -577,11 +589,16 @@ class DeductionCheckupCollector:
         tax_rate = self.data.get('estimated_tax_rate', 0.20)
         
         # 获取收入范围描述
-        income = self.data.get('annual_income', (0, float('inf')))
-        if income[1] == float('inf'):
-            income_desc = f"{income[0]//10000}万元以上"
+        income = self.data.get('annual_income', 0)
+        if isinstance(income, (int, float)):
+            income_desc = f"{income//10000}万元"
+        elif isinstance(income, (list, tuple)) and len(income) >= 2:
+            if income[1] == float('inf'):
+                income_desc = f"{income[0]//10000}万元以上"
+            else:
+                income_desc = f"{income[0]//10000}-{income[1]//10000}万元"
         else:
-            income_desc = f"{income[0]//10000}-{income[1]//10000}万元"
+            income_desc = "未填写"
         
         report = []
         report.append("=" * 66)
