@@ -98,7 +98,10 @@ def gen_detailed_report(result, monthly_details=None):
     if monthly_details:
         m_rows = []
         for m in monthly_details:
-            m_rows.append((str(m['month']), fmt(m['monthly_income']), fmt(m['cumulative_income']), fmt(m['cumulative_deduction']), fmt(m['cumulative_taxable']), fmt(m['cumulative_tax']), fmt(m['monthly_tax'])))
+            if isinstance(m, dict):
+                m_rows.append((str(m.get('month', '')), fmt(m.get('monthly_income', 0)), fmt(m.get('cumulative_income', 0)), fmt(m.get('cumulative_deduction', 0)), fmt(m.get('cumulative_taxable', 0)), fmt(m.get('cumulative_tax', 0)), fmt(m.get('monthly_tax', 0))))
+            else:
+                m_rows.append((str(m[0]), fmt(m[1]), fmt(m[2]), fmt(m[3]), fmt(m[4]), fmt(m[5]), fmt(m[6])))
         monthly_html = "<h2>月度预扣预缴明细</h2>" + build_table(
             ["月份", "本月收入", "累计收入", "累计扣除", "累计应纳税所得额", "累计应纳税额", "本月预扣"],
             m_rows,
