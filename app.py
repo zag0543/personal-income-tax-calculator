@@ -286,7 +286,9 @@ def render_sidebar():
         st.divider()
         with st.expander("💬 匿名留言簿", expanded=False):
             st.caption("反馈建议或问题描述，匿名提交")
-            msg_text = st.text_area("留言内容", placeholder="请输入您的建议或遇到的问题...", max_chars=500, key="gb_input")
+            if "gb_count" not in st.session_state:
+                st.session_state.gb_count = 0
+            msg_text = st.text_area("留言内容", placeholder="请输入您的建议或遇到的问题...", max_chars=500, key=f"gb_input_{st.session_state.gb_count}")
             if st.button("提交留言", key="gb_submit", use_container_width=True):
                 if msg_text.strip():
                     gb_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "guestbook.json")
@@ -304,8 +306,7 @@ def render_sidebar():
                     })
                     with open(gb_file, "w", encoding="utf-8") as f:
                         json.dump(msgs[:50], f, ensure_ascii=False, indent=2)
-                    st.success("✅ 提交成功！")
-                    st.session_state.gb_input = ""
+                    st.session_state.gb_count += 1
                     st.rerun()
             # 显示已有留言
             gb_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "guestbook.json")

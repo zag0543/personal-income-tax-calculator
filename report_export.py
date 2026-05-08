@@ -5,6 +5,8 @@
 import json
 from datetime import datetime
 
+from scripts.deduction_checkup import DEDUCTION_POLICIES
+
 # ── HTML 模板 ──
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -152,7 +154,7 @@ def gen_checkup_report(collector):
         rows = []
         for item in diagnosis['possible_missed']:
             ptype = item['type']
-            policy = collector.DEDUCTION_POLICIES.get(ptype, {})
+            policy = DEDUCTION_POLICIES.get(ptype, {})
             name = policy.get('name', ptype)
             rows.append((name, fmt(item['amount']), fmt(item['savings']), item['action']))
         missed_html = "<h2>⚠️ 可能有遗漏的扣除项</h2>" + build_table(
@@ -164,7 +166,7 @@ def gen_checkup_report(collector):
     na_html = ""
     if diagnosis['not_applicable']:
         items = "".join(
-            f"<li><strong>{collector.DEDUCTION_POLICIES.get(item['type'], {}).get('name', item['type'])}</strong>：{item['reason']} → {item['suggestion']}</li>"
+            f"<li><strong>{DEDUCTION_POLICIES.get(item['type'], {}).get('name', item['type'])}</strong>：{item['reason']} → {item['suggestion']}</li>"
             for item in diagnosis['not_applicable']
         )
         na_html = f"<h2>❓ 暂不符合条件</h2><ul>{items}</ul>"
@@ -173,7 +175,7 @@ def gen_checkup_report(collector):
     action_html = ""
     if diagnosis['possible_missed']:
         items = "".join(
-            f"<li><strong>{collector.DEDUCTION_POLICIES.get(item['type'], {}).get('name', item['type'])}</strong>：{item['action']}</li>"
+            f"<li><strong>{DEDUCTION_POLICIES.get(item['type'], {}).get('name', item['type'])}</strong>：{item['action']}</li>"
             for item in diagnosis['possible_missed']
         )
         action_html = f"<h2>📋 补申报行动清单</h2><ol>{items}</ol>"
