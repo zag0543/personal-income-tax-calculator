@@ -7,6 +7,7 @@
 import sys
 import os
 import json
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 
@@ -15,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scripts.quick_calculator import quick_calculate, compare_bonus_methods, calculate_pension_tax_benefit
 from scripts.tax_calculator import calculate_annual_settlement, generate_monthly_details
 from scripts.deduction_checkup import DeductionCheckupCollector, DEDUCTION_POLICIES
+from report_export import gen_detailed_report, gen_checkup_report, gen_joint_report
 
 # ── 页面配置 ──
 st.set_page_config(
@@ -279,6 +281,62 @@ def render_sidebar():
         city = st.session_state.shared["city"]
         st.caption(f"✅ 已配置：月薪 ¥{income:,} · {city}")
         st.caption("💡 切换板块后可直接[导入基础信息]")
+
+        # ── 技术支持 & 留言簿 ──
+        st.divider()
+        with st.expander("💬 匿名留言簿", expanded=False):
+            st.caption("反馈建议或问题描述，匿名提交")
+            msg_text = st.text_area("留言内容", placeholder="请输入您的建议或遇到的问题...", max_chars=500, key="gb_input")
+            if st.button("提交留言", key="gb_submit", use_container_width=True):
+                if msg_text.strip():
+                    gb_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "guestbook.json")
+                    os.makedirs(os.path.dirname(gb_file), exist_ok=True)
+                    msgs = []
+                    if os.path.exists(gb_file):
+                        try:
+                            with open(gb_file, "r", encoding="utf-8") as f:
+                                msgs = json.load(f)
+                        except:
+                            msgs = []
+                    msgs.insert(0, {
+                        "time": datetime.now().strftime("%m-%d %H:%M"),
+                        "text": msg_text.strip(),
+                    })
+                    with open(gb_file, "w", encoding="utf-8") as f:
+                        json.dump(msgs[:50], f, ensure_ascii=False, indent=2)
+                    st.success("✅ 提交成功！")
+                    st.session_state.gb_input = ""
+                    st.rerun()
+            # 显示已有留言
+            gb_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "guestbook.json")
+            if os.path.exists(gb_file):
+                try:
+                    with open(gb_file, "r", encoding="utf-8") as f:
+                        msgs = json.load(f)
+                    for m in msgs[:10]:
+                        st.markdown(f"**{m['time']}**  {m['text']}")
+                        st.divider()
+                except:
+                    pass
+
+        with st.expander("🔧 技术支持", expanded=False):
+            st.markdown("如有任何问题，欢迎联系：")
+            st.markdown("- 📧 Email：support@example.com")
+            st.markdown("- 💬 微信：扫描下方二维码")
+            # WeChat QR code — 用户将二维码图片放在 assets/wechat_qr.png
+            qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "wechat_qr.png")
+            if os.path.exists(qr_path):
+                st.image(qr_path, caption="扫码添加微信，获取专业税务规划建议", use_container_width=True)
+            else:
+                st.info("📷 请将微信二维码图片放在 `assets/wechat_qr.png`")
+                st.markdown("""
+                **为什么加微信？**
+                - 个税筹划咨询 & 政策解读
+                - 个人养老金开户指导 & 产品推荐
+                - 家庭财务 & 保险存款规划
+                """)
+            st.markdown("---")
+            st.markdown("**免责声明**：本工具计算结果仅供参考，实际税额以税务机关核定为准。")
 
 
 # =============================================================
@@ -570,6 +628,26 @@ def render_detailed_tab():
                 })
                 st.session_state.sync_detailed_ok = True
                 st.rerun()
+
+        # 导出报告
+        with st.expander("📄 导出报告", expanded=False):
+            html_report = gen_detailed_report(result, months)
+            st.download_button(
+                "📥 下载 HTML 报告",
+                data=html_report,
+                file_name=f"个税报告_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                mime="text/html",
+                use_container_width=True,
+                key="dl_detailed_html",
+            )
+            st.download_button(
+                "📥 下载 Word 文档（.doc）",
+                data=html_report,
+                file_name=f"个税报告_{datetime.now().strftime('%Y%m%d_%H%M')}.doc",
+                mime="application/msword",
+                use_container_width=True,
+                key="dl_detailed_doc",
+            )
 
 
 # =============================================================
@@ -973,6 +1051,26 @@ def render_checkup_tab():
             st.success("✅ 年收入已同步到侧边栏基础信息！")
             st.session_state.sync_checkup_ok = False
 
+        # 导出体检报告
+        with st.expander("📄 导出体检报告", expanded=False):
+            checkup_html = gen_checkup_report(collector)
+            st.download_button(
+                "📥 下载 HTML 报告",
+                data=checkup_html,
+                file_name=f"个税体检报告_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                mime="text/html",
+                use_container_width=True,
+                key="dl_checkup_html",
+            )
+            st.download_button(
+                "📥 下载 Word 文档（.doc）",
+                data=checkup_html,
+                file_name=f"个税体检报告_{datetime.now().strftime('%Y%m%d_%H%M')}.doc",
+                mime="application/msword",
+                use_container_width=True,
+                key="dl_checkup_doc",
+            )
+
         if st.button("重新体检", type="primary"):
             for key in ["checkup_step", "checkup_data", "checkup_report"]:
                 if key in st.session_state:
@@ -1372,6 +1470,34 @@ def render_joint_tab():
                 })
                 st.session_state.sync_joint_ok = True
                 st.rerun()
+
+        # 导出报告
+        with st.expander("📄 导出报告", expanded=False):
+            joint_html = gen_joint_report(
+                a_data=a_base, b_data=b_base,
+                a_opt=a_opt, b_opt=b_opt,
+                a_base=a_base, b_base=b_base,
+                base_total=base_total, opt_total=opt_total,
+                savings=savings,
+                a_portion=a_portion, b_portion=b_portion,
+                a_income=a_income, b_income=b_income,
+            )
+            st.download_button(
+                "📥 下载 HTML 报告",
+                data=joint_html,
+                file_name=f"夫妻申报报告_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                mime="text/html",
+                use_container_width=True,
+                key="dl_joint_html",
+            )
+            st.download_button(
+                "📥 下载 Word 文档（.doc）",
+                data=joint_html,
+                file_name=f"夫妻申报报告_{datetime.now().strftime('%Y%m%d_%H%M')}.doc",
+                mime="application/msword",
+                use_container_width=True,
+                key="dl_joint_doc",
+            )
 
 
 # =============================================================
