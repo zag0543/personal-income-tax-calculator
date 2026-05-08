@@ -1021,21 +1021,32 @@ def render_pension_tab():
 
     st.divider()
 
+    # 从侧边栏重新加载按钮
+    c_reload, _ = st.columns([1, 3])
+    with c_reload:
+        if st.button("🔄 从侧边栏加载最新数据", key="reload_pension_btn", use_container_width=True):
+            for k in ["p_income", "p_additions", "p_ins", "p_pension"]:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.rerun()
+
     # 自定义计算
     st.markdown("#### 🧮 自定义计算")
     with st.form("pension_form"):
         c1, c2 = st.columns(2)
         with c1:
+            # 根据 sidebar 当前值设定默认值，但若用户已手动修改过则保持不变
             annual_income = st.number_input("年工资薪金收入（元）", min_value=0,
-                                            value=s["monthly_income"] * 12, step=10000, key="p_income")
+                                            value=s["monthly_income"] * 12, step=10000, key="p_income",
+                                            help="等于侧边栏中的「月税前收入 × 12」，可在侧边栏修改后点「从侧边栏加载」刷新")
             monthly_additions = st.number_input("月度专项附加扣除（元）", min_value=0,
                                                 value=monthly_total_ded, step=500, key="p_additions",
-                                                help="如子女教育、住房租金等月度专项附加扣除合计")
+                                                help="等于侧边栏中各专项附加扣除项之和")
         with c2:
             monthly_insurance = st.number_input("月度社保公积金（元）", min_value=0,
                                                 value=int(s["monthly_income"] * s["insurance_rate"]),
                                                 step=500, key="p_ins",
-                                                help="个人承担的社保和公积金月度合计")
+                                                help="等于侧边栏中的「月税前收入 × 社保比例」")
             pension_amount = st.selectbox("个人养老金年缴存额（元）",
                                           options=[12000, 6000, 3000, 0],
                                           index=0 if s["personal_pension"] >= 12000
@@ -1046,6 +1057,10 @@ def render_pension_tab():
         submitted = st.form_submit_button("计算税收优惠", type="primary", use_container_width=True)
 
     if submitted:
+        # 当收入低于基本减除费用时提示用户
+        if annual_income < 60000:
+            st.warning("⚠️ 年收入低于 60,000 元（基本减除费用），应纳税所得额为 0，个人养老金暂无法产生节税效果。请确认年收入是否正确，或从侧边栏重新加载。")
+
         result = calculate_pension_tax_benefit(
             annual_income=annual_income,
             other_deductions_monthly=monthly_additions,
@@ -1091,14 +1106,11 @@ def render_pension_tab():
         等效年化收益率 **{result['return_rate'] * 100:.1f}%**。
         """)
 
-        # 同步到基础信息
+        # 同步到基础信息（仅同步养老金金额，不同步收入以免覆盖侧边栏）
         col_a, _ = st.columns([1, 2])
         with col_a:
             if st.button("💾 同步个人养老金到基础信息", key="sync_pension", use_container_width=True):
-                sync_to_shared({
-                    "personal_pension": pension_amount,
-                    "monthly_income": annual_income // 12,
-                })
+                sync_to_shared({"personal_pension": pension_amount})
                 st.session_state.sync_pension_ok = True
                 st.rerun()
 
