@@ -330,6 +330,11 @@ def render_quick_tab():
 
         submitted = st.form_submit_button("开始估算", type="primary", use_container_width=True)
 
+    # 同步成功提示（跨 rerun 保持）
+    if st.session_state.get("sync_quick_ok"):
+        st.success("✅ 已保存到侧边栏基础信息！")
+        st.session_state.sync_quick_ok = False
+
     if submitted:
         annual_salary = monthly_income * 12
         total_insurance = annual_salary * social_insurance_rate
@@ -382,7 +387,7 @@ def render_quick_tab():
                     "insurance_rate": social_insurance_rate,
                     "bonus_method": bonus_method,
                 })
-                st.success("已保存到侧边栏基础信息！")
+                st.session_state.sync_quick_ok = True
                 st.rerun()
 
 
@@ -474,6 +479,11 @@ def render_detailed_tab():
 
         submitted = st.form_submit_button("开始计算", type="primary", use_container_width=True)
 
+    # 同步成功提示（跨 rerun 保持）
+    if st.session_state.get("sync_detailed_ok"):
+        st.success("✅ 已保存到侧边栏基础信息！")
+        st.session_state.sync_detailed_ok = False
+
     if submitted:
         annual_income = monthly_salary * 12 + other_income
         total_insurance = monthly_salary * 12 * social_insurance_rate
@@ -497,14 +507,12 @@ def render_detailed_tab():
         st.divider()
         st.success("计算完成")
 
-        cols = st.columns(4)
-        with cols[0]:
+        r1, r2 = st.columns(2)
+        with r1:
             st.metric("应纳税所得额", fmt(result["taxable_income"]))
-        with cols[1]:
-            st.metric("综合所得税额", fmt(result["income_tax"]))
-        with cols[2]:
             st.metric("年终奖税额", fmt(result["bonus_tax"]))
-        with cols[3]:
+        with r2:
+            st.metric("综合所得税额", fmt(result["income_tax"]))
             st.metric("合计应纳税额", fmt(result["total_tax"]))
 
         if unit_withheld > 0:
@@ -515,15 +523,15 @@ def render_detailed_tab():
 
         with st.expander("查看完整明细"):
             detail = {
-                "年度总收入": result["annual_income"],
-                "扣除项目合计": result["total_deductions"],
-                "应纳税所得额": result["taxable_income"],
-                "综合所得税额": result["income_tax"],
-                "年终奖税额": result["bonus_tax"],
-                "合计应纳税额": result["total_tax"],
-                "单位已代扣": result["unit_withheld"],
+                "年度总收入": fmt(result["annual_income"]),
+                "扣除项目合计": fmt(result["total_deductions"]),
+                "应纳税所得额": fmt(result["taxable_income"]),
+                "综合所得税额": fmt(result["income_tax"]),
+                "年终奖税额": fmt(result["bonus_tax"]),
+                "合计应纳税额": fmt(result["total_tax"]),
+                "单位已代扣": fmt(result["unit_withheld"]),
                 "汇算结果": result["result"],
-                "应退/补金额": result["amount"],
+                "应退/补金额": fmt(result["amount"]),
             }
             st.json(detail)
 
@@ -560,7 +568,7 @@ def render_detailed_tab():
                     "bonus_method": bonus_method,
                     **ded_inputs,
                 })
-                st.success("已保存到侧边栏基础信息！")
+                st.session_state.sync_detailed_ok = True
                 st.rerun()
 
 
@@ -948,6 +956,23 @@ def render_checkup_tab():
         st.info("💡 温馨提示：扣除项填报可通过 **个人所得税APP** 完成，每年12月可确认次年扣除信息。")
         st.caption("以上报告基于您提供的信息自动生成，仅供参考。实际扣除资格以税务机关核定为准。")
 
+        # 同步体检年收入到基础信息
+        income = data.get('annual_income', (0, 0))
+        if isinstance(income, (list, tuple)) and len(income) >= 2:
+            est_annual = income[0] if income[1] == float('inf') else (income[0] + income[1]) // 2
+        else:
+            est_annual = 0
+        if est_annual > 0:
+            sync_col, _ = st.columns([1, 2])
+            with sync_col:
+                if st.button("💾 保存年收入到基础信息", key="sync_checkup", use_container_width=True):
+                    sync_to_shared({"monthly_income": est_annual // 12})
+                    st.session_state.sync_checkup_ok = True
+                    st.rerun()
+        if st.session_state.get("sync_checkup_ok"):
+            st.success("✅ 年收入已同步到侧边栏基础信息！")
+            st.session_state.sync_checkup_ok = False
+
         if st.button("重新体检", type="primary"):
             for key in ["checkup_step", "checkup_data", "checkup_report"]:
                 if key in st.session_state:
@@ -988,6 +1013,11 @@ def render_pension_tab():
     ]
     df_rate = pd.DataFrame(rate_data)
     st.dataframe(df_rate, hide_index=True, use_container_width=True)
+
+    # 同步成功提示（跨 rerun 保持）
+    if st.session_state.get("sync_pension_ok"):
+        st.success("✅ 已同步到侧边栏基础信息！")
+        st.session_state.sync_pension_ok = False
 
     st.divider()
 
@@ -1069,7 +1099,7 @@ def render_pension_tab():
                     "personal_pension": pension_amount,
                     "monthly_income": annual_income // 12,
                 })
-                st.success("已保存到侧边栏基础信息！")
+                st.session_state.sync_pension_ok = True
                 st.rerun()
 
     # 注意事项
@@ -1314,7 +1344,11 @@ def render_joint_tab():
             - 赡养老人各算各的，不能互相转移
             """)
 
-        # 同步配偶 A 到基础信息
+        # 同步成功提示
+        if st.session_state.get("sync_joint_ok"):
+            st.success("✅ 配偶 A 已同步到侧边栏基础信息！")
+            st.session_state.sync_joint_ok = False
+
         col_a, _ = st.columns([1, 2])
         with col_a:
             if st.button("💾 同步配偶 A 数据到基础信息", key="sync_joint", use_container_width=True):
@@ -1324,7 +1358,7 @@ def render_joint_tab():
                     "insurance_rate": a_rate,
                     "bonus_method": a_bonus_method,
                 })
-                st.success("已保存到侧边栏基础信息！")
+                st.session_state.sync_joint_ok = True
                 st.rerun()
 
 
