@@ -159,6 +159,128 @@ def get_tax_rate_for_income(taxable_income):
     return 0.45
 
 
+# ── 初始化共享基础信息 ──
+SHARED_DEFAULTS = {
+    "monthly_income": 15000,
+    "annual_bonus": 0,
+    "city": "上海",
+    "insurance_rate": 0.175,
+    "bonus_method": "单独计税",
+    "children_edu": 0,
+    "infant_care": 0,
+    "elderly_care": 0,
+    "housing_loan": 0,
+    "housing_rent": 0,
+    "continuing_edu": 0,
+    "serious_illness": 0,
+    "personal_pension": 0,
+    "health_insurance": 0,
+    "other_income": 0,
+    "unit_withheld": 0,
+}
+
+if "shared" not in st.session_state:
+    st.session_state.shared = dict(SHARED_DEFAULTS)
+
+
+def sync_to_shared(source):
+    """将源 dict 中的值同步到共享基础信息"""
+    for k in SHARED_DEFAULTS:
+        if k in source:
+            st.session_state.shared[k] = source[k]
+
+
+def render_sidebar():
+    """侧边栏基础信息配置"""
+    with st.sidebar:
+        st.markdown("### 📋 基础信息")
+        st.caption("在此设置公共参数，所有板块自动读取")
+
+        with st.expander("💰 收入信息", expanded=True):
+            st.session_state.shared["monthly_income"] = st.number_input(
+                "月税前收入（元）", min_value=0,
+                value=st.session_state.shared["monthly_income"],
+                step=1000, key="sb_income",
+            )
+            st.session_state.shared["annual_bonus"] = st.number_input(
+                "年终奖（元）", min_value=0,
+                value=st.session_state.shared["annual_bonus"],
+                step=1000, key="sb_bonus",
+            )
+
+        with st.expander("🏙️ 城市与社保", expanded=True):
+            city_idx = list(CITY_RATES.keys()).index(
+                st.session_state.shared["city"]
+            ) if st.session_state.shared["city"] in CITY_RATES else 0
+
+            st.session_state.shared["city"] = st.selectbox(
+                "所在城市", list(CITY_RATES.keys()),
+                index=city_idx, key="sb_city",
+            )
+            default_rate = CITY_RATES.get(
+                st.session_state.shared["city"], 0.175
+            )
+            st.session_state.shared["insurance_rate"] = st.slider(
+                "社保公积金个人比例", 0.0, 0.50,
+                value=default_rate, step=0.005,
+                format="%.1f%%", key="sb_rate",
+            )
+
+        with st.expander("📝 专项附加扣除（月）", expanded=False):
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                st.session_state.shared["children_edu"] = st.number_input(
+                    "子女教育", 0, 2000,
+                    value=st.session_state.shared["children_edu"],
+                    step=100, key="sb_ce",
+                )
+                st.session_state.shared["infant_care"] = st.number_input(
+                    "婴幼儿照护", 0, 2000,
+                    value=st.session_state.shared["infant_care"],
+                    step=100, key="sb_ic",
+                )
+                st.session_state.shared["elderly_care"] = st.number_input(
+                    "赡养老人", 0, 3000,
+                    value=st.session_state.shared["elderly_care"],
+                    step=100, key="sb_ec",
+                )
+            with sc2:
+                st.session_state.shared["housing_loan"] = st.number_input(
+                    "住房贷款利息", 0, 1000,
+                    value=st.session_state.shared["housing_loan"],
+                    step=100, key="sb_hl",
+                )
+                st.session_state.shared["housing_rent"] = st.number_input(
+                    "住房租金", 0, 1500,
+                    value=st.session_state.shared["housing_rent"],
+                    step=100, key="sb_hr",
+                )
+                st.session_state.shared["continuing_edu"] = st.number_input(
+                    "继续教育", 0, 400,
+                    value=st.session_state.shared["continuing_edu"],
+                    step=100, key="sb_cedu",
+                )
+
+        with st.expander("🏥 其他扣除（年）", expanded=False):
+            st.session_state.shared["personal_pension"] = st.number_input(
+                "个人养老金", 0, 12000,
+                value=st.session_state.shared["personal_pension"],
+                step=1000, key="sb_pp",
+            )
+            st.session_state.shared["health_insurance"] = st.number_input(
+                "税优健康险", 0, 2400,
+                value=st.session_state.shared["health_insurance"],
+                step=200, key="sb_hi",
+            )
+
+        # 状态提示
+        st.divider()
+        income = st.session_state.shared["monthly_income"]
+        city = st.session_state.shared["city"]
+        st.caption(f"✅ 已配置：月薪 ¥{income:,} · {city}")
+        st.caption("💡 切换板块后可直接[导入基础信息]")
+
+
 # =============================================================
 # Tab 1: 快速估算
 # =============================================================
@@ -167,19 +289,34 @@ def render_quick_tab():
     st.subheader("快速估算年度个税")
     st.caption("适合简单场景，输入几项关键参数即可得到估算结果")
 
+    s = st.session_state.shared
+
+    # 显示从基础信息导入的值
+    st.info(
+        f"📥 已加载基础信息：月薪 **¥{s['monthly_income']:,}** · "
+        f"年终奖 **¥{s['annual_bonus']:,}** · "
+        f"城市 **{s['city']}** · "
+        f"比例 **{s['insurance_rate']*100:.1f}%**",
+        icon="💡",
+    )
+
     with st.form("quick_form"):
         col1, col2 = st.columns(2)
 
         with col1:
             monthly_income = st.number_input(
-                "月税前收入（元）", min_value=0, value=15000, step=1000
+                "月税前收入（元）", min_value=0,
+                value=s["monthly_income"], step=1000,
             )
             bonus_amount = st.number_input(
-                "年终奖（元）", min_value=0, value=0, step=1000
+                "年终奖（元）", min_value=0,
+                value=s["annual_bonus"], step=1000,
             )
 
         with col2:
-            city = st.selectbox("所在城市", list(CITY_RATES.keys()), index=1)
+            city = st.selectbox("所在城市", list(CITY_RATES.keys()),
+                                index=list(CITY_RATES.keys()).index(s["city"])
+                                if s["city"] in CITY_RATES else 1)
             default_rate = CITY_RATES.get(city, 0.175)
             social_insurance_rate = st.slider(
                 "社保公积金个人总比例",
@@ -187,7 +324,9 @@ def render_quick_tab():
                 value=default_rate, step=0.005,
                 format="%.1f%%",
             )
-            bonus_method = st.radio("年终奖计税方式", ["单独计税", "并入综合所得"])
+            bonus_method = st.radio("年终奖计税方式",
+                                    ["单独计税", "并入综合所得"],
+                                    index=0 if s["bonus_method"] == "单独计税" else 1)
 
         submitted = st.form_submit_button("开始估算", type="primary", use_container_width=True)
 
@@ -232,6 +371,20 @@ def render_quick_tab():
                     delta=f"可节省 {fmt(comparison['tax_savings'])}",
                 )
 
+        # 同步到基础信息
+        col_a, _ = st.columns([1, 2])
+        with col_a:
+            if st.button("💾 保存此数据到基础信息", key="sync_quick", use_container_width=True):
+                sync_to_shared({
+                    "monthly_income": monthly_income,
+                    "annual_bonus": bonus_amount,
+                    "city": city,
+                    "insurance_rate": social_insurance_rate,
+                    "bonus_method": bonus_method,
+                })
+                st.success("已保存到侧边栏基础信息！")
+                st.rerun()
+
 
 # =============================================================
 # Tab 2: 详细计算
@@ -241,25 +394,38 @@ def render_detailed_tab():
     st.subheader("详细年度汇算清缴")
     st.caption("支持全部专项附加扣除项目，更精确地模拟汇算清缴")
 
+    s = st.session_state.shared
+    st.info(
+        f"📥 已加载基础信息：月薪 **¥{s['monthly_income']:,}** · "
+        f"年终奖 **¥{s['annual_bonus']:,}** · "
+        f"比例 **{s['insurance_rate']*100:.1f}%**",
+        icon="💡",
+    )
+
     with st.form("detailed_form"):
         col1, col2 = st.columns(2)
         with col1:
             monthly_salary = st.number_input(
-                "月薪（元）", min_value=0, value=15000, step=1000
+                "月薪（元）", min_value=0,
+                value=s["monthly_income"], step=1000,
             )
             annual_bonus = st.number_input(
-                "年终奖（元）", min_value=0, value=0, step=1000
+                "年终奖（元）", min_value=0,
+                value=s["annual_bonus"], step=1000,
             )
         with col2:
             other_income = st.number_input(
-                "其他年度收入（元）", min_value=0, value=0, step=1000
+                "其他年度收入（元）", min_value=0,
+                value=s["other_income"], step=1000,
             )
             unit_withheld = st.number_input(
-                "单位全年已代扣代缴（元）", min_value=0.0, value=0.0, step=1000.0,
+                "单位全年已代扣代缴（元）", min_value=0.0,
+                value=float(s["unit_withheld"]), step=1000.0,
                 format="%.2f",
             )
 
-        bonus_method = st.radio("年终奖计税方式", ["单独计税", "并入综合所得"], horizontal=True)
+        bonus_method = st.radio("年终奖计税方式", ["单独计税", "并入综合所得"], horizontal=True,
+                                index=0 if s["bonus_method"] == "单独计税" else 1)
 
         st.markdown("#### 社保公积金")
         col_rat, _ = st.columns([1, 1])
@@ -267,7 +433,7 @@ def render_detailed_tab():
             social_insurance_rate = st.slider(
                 "三险一金个人总比例",
                 min_value=0.0, max_value=0.50,
-                value=0.175, step=0.005,
+                value=s["insurance_rate"], step=0.005,
                 format="%.1f%%",
             )
 
@@ -278,10 +444,11 @@ def render_detailed_tab():
         for idx, (label, cfg) in enumerate(items_list):
             col = [sc1, sc2, sc3][idx % 3]
             with col:
+                ded_val = s.get(cfg["key"], 0)
                 ded_inputs[cfg["key"]] = st.number_input(
                     f"{label}（元）",
                     min_value=0, max_value=cfg["max"],
-                    value=0, step=cfg["step"],
+                    value=ded_val, step=cfg["step"],
                     help=cfg["help"],
                 )
 
@@ -290,18 +457,18 @@ def render_detailed_tab():
         with ce1:
             ded_inputs["serious_illness"] = st.number_input(
                 "大病医疗（元/年）", min_value=0, max_value=80000,
-                value=0, step=1000,
+                value=s["serious_illness"], step=1000,
                 help="医保目录内自付超过 15000 元的部分，据实扣除，上限 80000 元",
             )
             ded_inputs["personal_pension"] = st.number_input(
                 "个人养老金（元/年）", min_value=0, max_value=12000,
-                value=0, step=1000,
+                value=s["personal_pension"], step=1000,
                 help="个人向个人养老金账户缴存，上限 12000 元/年",
             )
         with ce2:
             ded_inputs["health_insurance"] = st.number_input(
                 "税优健康险（元/年）", min_value=0, max_value=2400,
-                value=0, step=200,
+                value=s["health_insurance"], step=200,
                 help="税前扣除，上限 2400 元/年",
             )
 
@@ -380,6 +547,21 @@ def render_detailed_tab():
             df["累计应纳税额"] = df["累计应纳税额"].apply(fmt)
             df["本月预扣"] = df["本月预扣"].apply(fmt)
             st.dataframe(df, hide_index=True, use_container_width=True)
+
+        # 同步到基础信息
+        col_a, _ = st.columns([1, 2])
+        with col_a:
+            if st.button("💾 保存此数据到基础信息", key="sync_detailed", use_container_width=True):
+                sync_to_shared({
+                    "monthly_income": monthly_salary,
+                    "annual_bonus": annual_bonus,
+                    "other_income": other_income,
+                    "insurance_rate": social_insurance_rate,
+                    "bonus_method": bonus_method,
+                    **ded_inputs,
+                })
+                st.success("已保存到侧边栏基础信息！")
+                st.rerun()
 
 
 # =============================================================
@@ -781,6 +963,16 @@ def render_pension_tab():
     st.subheader("💰 个人养老金税收优惠计算")
     st.caption("测算个人养老金缴存的税收优惠效果，收入越高省税越多")
 
+    s = st.session_state.shared
+    monthly_total_ded = sum(s[k] for k in ["children_edu", "infant_care", "elderly_care",
+                                            "housing_loan", "housing_rent", "continuing_edu"])
+    st.info(
+        f"📥 已加载基础信息：月薪 **¥{s['monthly_income']:,}** · "
+        f"专项附加扣除 **¥{monthly_total_ded:,}/月** · "
+        f"个人养老金 **¥{s['personal_pension']:,}/年**",
+        icon="💡",
+    )
+
     st.markdown("""
     > **个人养老金**：每年最高缴存 **12,000 元**，可在税前扣除。
     > 领取时按 3% 税率缴税。收入越高，边际税率越高，节税效果越显著。
@@ -804,13 +996,22 @@ def render_pension_tab():
     with st.form("pension_form"):
         c1, c2 = st.columns(2)
         with c1:
-            annual_income = st.number_input("年工资薪金收入（元）", min_value=0, value=200000, step=10000, key="p_income")
-            monthly_additions = st.number_input("月度专项附加扣除（元）", min_value=0, value=2000, step=500, key="p_additions",
+            annual_income = st.number_input("年工资薪金收入（元）", min_value=0,
+                                            value=s["monthly_income"] * 12, step=10000, key="p_income")
+            monthly_additions = st.number_input("月度专项附加扣除（元）", min_value=0,
+                                                value=monthly_total_ded, step=500, key="p_additions",
                                                 help="如子女教育、住房租金等月度专项附加扣除合计")
         with c2:
-            monthly_insurance = st.number_input("月度社保公积金（元）", min_value=0, value=2500, step=500, key="p_ins",
+            monthly_insurance = st.number_input("月度社保公积金（元）", min_value=0,
+                                                value=int(s["monthly_income"] * s["insurance_rate"]),
+                                                step=500, key="p_ins",
                                                 help="个人承担的社保和公积金月度合计")
-            pension_amount = st.selectbox("个人养老金年缴存额（元）", options=[12000, 6000, 3000, 0], index=0, key="p_pension")
+            pension_amount = st.selectbox("个人养老金年缴存额（元）",
+                                          options=[12000, 6000, 3000, 0],
+                                          index=0 if s["personal_pension"] >= 12000
+                                                  else (1 if s["personal_pension"] >= 6000
+                                                        else (2 if s["personal_pension"] >= 3000 else 3)),
+                                          key="p_pension")
 
         submitted = st.form_submit_button("计算税收优惠", type="primary", use_container_width=True)
 
@@ -860,6 +1061,17 @@ def render_pension_tab():
         等效年化收益率 **{result['return_rate'] * 100:.1f}%**。
         """)
 
+        # 同步到基础信息
+        col_a, _ = st.columns([1, 2])
+        with col_a:
+            if st.button("💾 同步个人养老金到基础信息", key="sync_pension", use_container_width=True):
+                sync_to_shared({
+                    "personal_pension": pension_amount,
+                    "monthly_income": annual_income // 12,
+                })
+                st.success("已保存到侧边栏基础信息！")
+                st.rerun()
+
     # 注意事项
     with st.expander("📖 个人养老金政策说明"):
         st.markdown("""
@@ -888,20 +1100,33 @@ def render_joint_tab():
     st.subheader("👫 夫妻共同申报测算")
     st.caption("夫妻双方分别计算个税，对比独立申报与优化分配扣除项的差异")
 
+    s = st.session_state.shared
+    st.info(
+        f"📥 配偶 A 已加载基础信息：月薪 **¥{s['monthly_income']:,}** · "
+        f"年终奖 **¥{s['annual_bonus']:,}** · "
+        f"比例 **{s['insurance_rate']*100:.1f}%**",
+        icon="💡",
+    )
+
     st.markdown("""
     > **适用场景**：夫妻双方均可享受的扣除项（如子女教育、住房贷款利息、赡养老人等）
     > 可以在一方全额扣除，也可双方各分摊一半。合理分配可最大化税后收入。
     """)
 
     with st.form("joint_form"):
-        st.markdown("#### 👤 配偶 A")
+        st.markdown("#### 👤 配偶 A（本人）")
         c1, c2 = st.columns(2)
         with c1:
-            a_income = st.number_input("月薪（元）", min_value=0, value=20000, step=1000, key="ja_income")
-            a_bonus = st.number_input("年终奖（元）", min_value=0, value=0, step=1000, key="ja_bonus")
+            a_income = st.number_input("月薪（元）", min_value=0,
+                                       value=s["monthly_income"], step=1000, key="ja_income")
+            a_bonus = st.number_input("年终奖（元）", min_value=0,
+                                      value=s["annual_bonus"], step=1000, key="ja_bonus")
         with c2:
-            a_rate = st.slider("社保公积金比例", 0.0, 0.50, 0.175, 0.005, format="%.1f%%", key="ja_rate")
-            a_bonus_method = st.radio("年终奖方式", ["单独计税", "并入综合所得"], horizontal=True, key="ja_bonus_m")
+            a_rate = st.slider("社保公积金比例", 0.0, 0.50,
+                               value=s["insurance_rate"], step=0.005, format="%.1f%%", key="ja_rate")
+            a_bonus_method = st.radio("年终奖方式", ["单独计税", "并入综合所得"],
+                                      horizontal=True, key="ja_bonus_m",
+                                      index=0 if s["bonus_method"] == "单独计税" else 1)
 
         st.markdown("#### 👤 配偶 B")
         c3, c4 = st.columns(2)
@@ -1089,6 +1314,19 @@ def render_joint_tab():
             - 赡养老人各算各的，不能互相转移
             """)
 
+        # 同步配偶 A 到基础信息
+        col_a, _ = st.columns([1, 2])
+        with col_a:
+            if st.button("💾 同步配偶 A 数据到基础信息", key="sync_joint", use_container_width=True):
+                sync_to_shared({
+                    "monthly_income": a_income,
+                    "annual_bonus": a_bonus,
+                    "insurance_rate": a_rate,
+                    "bonus_method": a_bonus_method,
+                })
+                st.success("已保存到侧边栏基础信息！")
+                st.rerun()
+
 
 # =============================================================
 # 主页面
@@ -1098,6 +1336,8 @@ st.title("🧮 个人所得税计算器")
 st.markdown(
     "基于 **2025 年个人所得税法**，支持累计预扣预缴与年度汇算清缴。"
 )
+
+render_sidebar()
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "快速估算", "详细计算", "批量 JSON 上传",
