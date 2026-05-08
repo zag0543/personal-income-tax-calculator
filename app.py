@@ -284,6 +284,24 @@ def render_sidebar():
 
         # ── 技术支持 & 留言簿 ──
         st.divider()
+        # ── 技术支持（始终可见） ──
+        st.divider()
+        st.markdown("#### 🔧 技术支持")
+        st.markdown("- 📧 Email：271591959@qq.com")
+        st.markdown("- 💬 微信：扫码获取个税筹划咨询")
+        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "wechat_qr.png")
+        if os.path.exists(qr_path):
+            st.image(qr_path, caption="扫码添加微信，获取专业税务规划建议", use_container_width=True)
+        else:
+            st.info("📷 请将微信二维码图片放在 `assets/wechat_qr.png`")
+        with st.expander("📌 为什么加微信？", expanded=False):
+            st.markdown("""
+            - 个税筹划咨询 & 政策解读
+            - 个人养老金开户指导 & 产品推荐
+            - 家庭财务 & 保险存款规划
+            """)
+        st.divider()
+
         with st.expander("💬 匿名留言簿", expanded=False):
             st.caption("反馈建议或问题描述，匿名提交")
             if "gb_count" not in st.session_state:
@@ -320,23 +338,6 @@ def render_sidebar():
                 except:
                     pass
 
-        with st.expander("🔧 技术支持", expanded=False):
-            st.markdown("如有任何问题，欢迎联系：")
-            st.markdown("- 📧 Email：support@example.com")
-            st.markdown("- 💬 微信：扫描下方二维码")
-            # WeChat QR code — 用户将二维码图片放在 assets/wechat_qr.png
-            qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "wechat_qr.png")
-            if os.path.exists(qr_path):
-                st.image(qr_path, caption="扫码添加微信，获取专业税务规划建议", use_container_width=True)
-            else:
-                st.info("📷 请将微信二维码图片放在 `assets/wechat_qr.png`")
-                st.markdown("""
-                **为什么加微信？**
-                - 个税筹划咨询 & 政策解读
-                - 个人养老金开户指导 & 产品推荐
-                - 家庭财务 & 保险存款规划
-                """)
-            st.markdown("---")
             st.markdown("**免责声明**：本工具计算结果仅供参考，实际税额以税务机关核定为准。")
 
 
